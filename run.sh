@@ -31,6 +31,6 @@ hadoop jar $hadoop_jar \
 	-inputformat cs626.sentence.preprocessing.format.LineNumberInputFormat \
 	-partitioner cs626.sentence.preprocessing.format.FilePartitioner \
 	-output $output_dir
-	#-partitioner org.apache.hadoop.mapred.lib.HashPartitioner \
 hadoop fs -copyToLocal $output_dir/* $dir/
 hadoop fs -rm -r $output_dir/
+

@@ -1,9 +1,5 @@
 # mapper.py
 
-#import nltk
-#import nltk.data
-#from nltk.corpus import stopwords
-#from nltk.stem.porter import PorterStemmer
 import re
 import sys
 from unidecode import unidecode
@@ -23,23 +19,13 @@ except Exception as e:
     print('stopwords failure: [{}]'.format(repr(e)))
     exit()
 
-SENTENCE_ENDINGS = ['.', '!', '?', '"']
-ABBREVIATIONS = ['mr.', 'mrs.', 'ms.', 'jr.', 'sr.', 'dr.']
-
-CONTRACTION_PAIRS = [
-    ('\'ll', ' *ll'),
-    ('\'re', ' *re'),
-    ('\'s', ' *s'),
-    ('\'d', ' *d'),
-    ('\'m', ' *m'),
-    ('\'ve', ' *ve'),
-    ('n\'t', ' not'),
-    ('s\'', 's *')
+# Pre-defined contractions to keep
+CONTRACTIONS = [
+    'n\'t', '\'ll', '\'s', '\'re', '\'m', '\'d', '\'ve'
 ]
 
 # Sentence parsing methods
 # Removes unneeded punctuation in the data:
-# mr. -> mr, etc
 # hyphens between words, ex: A -- B -> A B
 # commas, double quotes, hyphens, colons, semi-colons
 def normalizeString(s):
@@ -48,15 +34,7 @@ def normalizeString(s):
     if re.search(r'((\'|\")\-+|\-+(\'|\"))', s):
         s = re.sub(r'(\'\-+\s*|\s*\-+\')', '\'', s)
         s = re.sub(r'(\"\-+\s*|\s*\-+\")', '\"', s)
-    s = re.sub(r'[\(\)\*\_\\\/,:]', ' ', s) # Punctuations to remove, replace with space
-    s = re.sub(r"\s\-+\s", ' ', s) # Replace 1 or more hyphens with spaces
-    # Abbreviated words to remove periods from
-    s = re.sub(r"mr\.", "mr", s)
-    s = re.sub(r"mrs\.", "mrs", s)
-    s = re.sub(r"ms\.", "ms", s)
-    s = re.sub(r'dr\.', 'dr', s)
-    s = re.sub(r'b\.c\.', 'bc', s)
-    s = re.sub(r'a\.d\.', 'ad', s)
+    s = re.sub(r'[\(\)\*\_\\\/\-,:]', ' ', s) # Punctuations to remove, replace with space
     return s
 
 # Handle multiple periods by determining if they end a sentence or not
@@ -173,7 +151,6 @@ def parse_dialogue(lines):
                             # Add the single word (with possible terminator split)
                             sentences.append(' '.join(separate_terminator(word)))
                         else:
-                            print('Possible incorrect dialogue construction around line [{}]'.format(line))
                             inDialogue = False # Correct dialogue errors?
                     elif re.match(r'^\".+$', word):
                         # Starting dialogue
@@ -193,45 +170,8 @@ def parse_dialogue(lines):
                         sentences.append(' '.join(currSentence)) # end the current sentence
                         currSentence = []
                     else:
-                        print('Double quote inconsistency around line: [{}]'.format(line))
                         # Remove double quote and add word
                         word = re.sub('"', '', word)
-                        currSentence.append(word)
-                elif '\'' in word:
-                    if re.match(r'^\'.+\'$', word):
-                        word = re.sub('\'', '', word)
-                        # End current sentence if it exists
-                        if len(currSentence) > 0:
-                            sentences.append(' '.join(currSentence))
-                            currSentence = []
-                        # Add the single word (with possible terminator split)
-                        sentences.append(' '.join(separate_terminator(word)))
-                    elif re.match(r'^\'.+$', word):
-                        inInnerDialogue = True
-                        # An existing sentence was not terminated before entering dialogue
-                        if len(currSentence) > 0:
-                            sentences.append(' '.join(currSentence)) # Add the sentence
-                        word = re.sub('\'', '', word)
-                        currSentence = [word] # Start a new sentence with the dialogue
-                    elif re.match(r'^.+\'$', word):
-                        # Naive check that this is the end of inner dialogue and not a plural possessive word
-                        if inInnerDialogue or word[-1] != 's':
-                            # End the inner dialogue
-                            inInnerDialogue = False
-                            word = re.sub('\'', '', word)
-                            # Check if the last word ended in one of our sentence terminators
-                            words = separate_terminator(word)
-                            currSentence += words
-                            sentences.append(' '.join(currSentence)) # end the current sentence
-                            currSentence = []
-                        else:
-                            # Potential plural possessive, add it and continue the current sentence
-                            word = re.sub('\'', '', word)
-                            currSentence.append(word)
-                    else:
-                        print('Single quote inconsistency around line: [{}]'.format(line))
-                        # Remove single quote and add word
-                        word = re.sub('\'', '', word)
                         currSentence.append(word)
                 else:
                     currSentence.append(word)
@@ -258,216 +198,95 @@ def remove_punctuation(lines, replace_str=''):
     return lines
 
 def convert_lines_to_sentences(lines):
-    # Tokenize lines
-    for i, line in enumerate(lines):
-        tokens = word_tokenize(line)
-        #tokens = [token for token in tokens if token.lower() not in stops]
-        lines[i] = ' '.join(tokens)
-    # Separate lines into sentences
+    # Convert unicode characters to their nearest ASCII equivalent
+    lines = [unidecode(line) for line in lines]
+    
+    # Use nltk to parse into sentences
     sentences = []
     tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
     for sentence in tokenizer.tokenize('\n'.join(lines)):
         # Replace newlines with spaces
         sentences.append(' '.join(sentence.split('\n')))
-    
-    return sentences
-    """
-    try:
-        tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
-    except Exception:
-        nltk.download('punkt')
-        tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
-    """
-    """
-    try:
-        # Convert unicode characters to their nearest ASCII equivalent
-        lines = [unidecode(line) for line in lines]
-    except:
-        print('CONVERSION FAILURE: UNIDECODE')
-    """
-    """
-    try:
-        # Use nltk to parse into sentences
-        sentences = []
-        for sentence in tokenizer.tokenize('\n'.join(lines)):
-            # Replace newlines with spaces
-            sentences.append(' '.join(sentence.split('\n')))
-    except:
-        print('CONVERSION FAILURE: nltk tokenize')
-    """
-    """
-    sentences = lines
-    try:
-        # Parse multiple periods to determine if they end a sentence
-        sentences = replace_multiple_periods(sentences)
-    except:
-        print('CONVERSION FAILURE: multiple periods')
+
+    # Parse multiple periods to determine if they end a sentence
+    sentences = replace_multiple_periods(sentences)
         
-    try:
-        # Lower and normalize the text
-        sentences = [normalizeString(line) for line in sentences]
-    except:
-        print('CONVERSION FAILURE: normalize string')
+    # Replace double single quotes with double quotes
+    sentences = [re.sub(r'\'\'', '"', sentence) for sentence in sentences]
 
-    try:
-        # Remove all single quotes via the contraction dictionary or predefined contraction pairs
-        for i, sentence in enumerate(sentences):
-            if '\'' in sentence:
-                # Now iterate over the sentence seeing if we can expand out any contractions
-                words = sentences[i].split()
-                for j, word in enumerate(words):
-                    if '\'' in word:
-                        # Remove any punctuation from word to expand:
-                        word = re.sub(r'[\.\!\?\;\:\"]', '', word)
-                        # Check if we can expand out any contractions in the words
-                        for contraction_pair in CONTRACTION_PAIRS:
-                            regex = r'{}$'.format(contraction_pair[0])
-                            if re.search(regex, word):
-                                words[j] = re.sub(regex, contraction_pair[1], word)
-                sentences[i] = ' '.join(words)
-    except:
-        print('CONVERSION FAILURE: predefined contractions')
+    
+    # Lower and normalize the text
+    sentences = [normalizeString(line) for line in sentences]
 
-    try:
-        # Separate dialogue into its own sentences
-        sentences = parse_dialogue(sentences)
-    except:
-        print('CONVERSION FAILURE: dialogue')
+    # Tokenize the sentences
+    for i, sentence in enumerate(sentences):
+        sentence = ' '.join(word_tokenize(sentence))
+        sentence = re.sub(r'(\'\'|\`\`)', '"', sentence)
+        sentence = re.sub(r'\s\'\s', ' " ', sentence)
+        # Append newlines on terminators to split on later
+        sentence = re.sub(r'\s\!\s', ' !\n ', sentence)
+        sentence = re.sub(r'\s\?\s', ' ?\n ', sentence)
+        sentence = re.sub(r'\s[\.\;]\s', ' \n ', sentence)
+        sentences[i] = sentence
 
-    try:
-        # Remove any leftover single quotes
-        sentences = [re.sub(r'\'', '', sentence) for sentence in sentences]
-    except:
-        print('CONVERSION FAILURE: remove single quotes')
-
-    try:
-        # Separate terminator tokens into their own sentences ('.', ';', '!', '?') and move ('?' and '!') into their own token
-        for i, sentence in enumerate(sentences):
-            # Find sentence terminators ('.', ';', !', and '?')
-            # Sentence with terminators still in the middle (multiple sentences), or the terminator ending the sentence is
-            # still attached to a token
-            if re.match(r'^.+[\.!?;].+$', sentence) or re.search(r'\w+[\.!?;]$', sentence):
-                parsed_sentence = []
-                for word in sentence.split():
-                    if re.match(r'\w+[\.!?;]$', word):
-                        # Terminator is attached to word
-                        words = separate_terminator(word)
-                        parsed_sentence += words + ['\n']
-                    elif word in ['.', '!', '?', ';']:
-                        parsed_sentence += [word, '\n']
-                    elif re.search(r'[\.!?;]', word):
-                        # Special case of multiple terminators concatenated
-                        words = []
-                        iters = 0
-                        word_len = len(word)
-                        while (re.search(r'[\.!?;]{2,}', word)):
-                            words += separate_terminator(word)
-                            word = ' '.join(words)
-                            if iters > word_len:
-                                break
-                            iters += 1
-                        words = separate_terminator(word)
-                        parsed_sentence += words
+    # Repleace known contractions with asterisks for placeholders
+    for i, sentence in enumerate(sentences):
+        if '\'' in sentence:
+            words = sentence.split()
+            for j, word in enumerate(words):
+                if '\'' in word:
+                    # Check if we have a known contraction, otherwise remove the single quote
+                    if word in CONTRACTIONS:
+                        words[j] = re.sub(r'\'', '\*', word)
                     else:
-                        parsed_sentence.append(word)
-                sentences[i] = ' '.join(parsed_sentence)
-    except:
-        print('CONVERSION FAILURE: terminator separation')
-            
-    try:
-        # Need one final pass to split on newlines gathered in terminator section
-        final_sentences = []
-        for sentence in sentences:
-            final_sentences += [s.strip() for s in sentence.split('\n') if len(s) > 0]
-    except:
-        print('CONVERSION FAILURE: split on newlines from terminators')
+                        words[j] = re.sub(r'\'', '', word)
+            sentences[i] = ' '.join(words)
 
-    try:
-        # Remove placeholder asterisks with single quotes
-        final_sentences = [re.sub(r'\*', '\'', sentence) for sentence in final_sentences]
-    except:
-        print('CONVERSION FAILURE: removing placeholder asterisks')
+    # Separate dialogue into its own sentences
+    sentences = parse_dialogue(sentences)
+    
+    # Remove any leftover single quotes
+    #sentences = [re.sub(r'\'', '', sentence) for sentence in sentences]
+    
+    # Need one final pass to split on newlines gathered in terminator section
+    final_sentences = []
+    for sentence in sentences:
+        final_sentences += [s.strip() for s in sentence.split('\n') if len(s) > 0]
 
-    try:
-        # Final pass to remove all punctuation
-        final_sentences = remove_punctuation(final_sentences)
-    except:
-        print('CONVERSION FAILURE: remove punctuation (final)')
+    # Remove placeholder asterisks with single quotes
+    final_sentences = [re.sub(r'\*', '\'', sentence) for sentence in final_sentences]
+    
+    # Final pass to remove all punctuation
+    return remove_punctuation(final_sentences)
 
-    return final_sentences
-    """
 def main():
     lines = []
     filename = None
     for line in sys.stdin:
         line = line.strip()
         if len(line) > 0:
-            #line = ' '.join(line.strip().split()[1:]).lower()
             # Check if this is being ran outside of Hadoop
             line_split = line.split()
             # Pos 0  = byte offset
             # Pos 1  = filename
             # Pos 2+ = line
-            #try:
             if filename is None:
                 filename = line_split[1]
             line = ' '.join(line_split[2:]).lower()
-            #except:
-            #print('REDUCER FAIL SPLIT: [{}]'.format(line))
-            
-            #line = '\t'.join(line.strip().split('\t')[1:]).lower()
+
             # Skip empty lines
             if len(line) > 0:
                 lines.append(line)
-    #converted = True
     try:
         sentences = convert_lines_to_sentences(lines)
     except Exception as e:
         print('CONVERSION FAILURE: [{}]'.format(repr(e)))
         return
-    #converted = False
-    #if converted:
-    #try:
+
     for i, sentence in enumerate(sentences):
         # Format: <filname>\t<sentence index>\t<sentence>
         print('{}\t{}\t{}'.format(filename, i, sentence))
-    #except:
-    #print('SENTENCE OUTPUT FAILURE')
-    #else:
-    #print('SENTENCE CONVERSION FAILURE: ELSE')
 
-# Old code for blocking:
-"""
-        #filename, line = line.split('\t', 1)
-        in_single_sentence = False
-        if len(curr_block) == 0:
-            curr_block = [line]
-            in_single_sentence = True
-        elif line[0] == '"':
-            # End the previous block
-            print('{}\t{}'.format('{},{}'.format(block_count, filename), ' '.join(curr_block)))
-            curr_block = [line]
-            block_count += 1
-            in_single_sentence = True
-        # Check if this line ends a sentence
-        if line[-1] in SENTENCE_ENDINGS:
-            # Check that it's not a period and one of our abbreviations
-            if line[-1] == '.' and line.split()[-1] in ABBREVIATIONS:
-                # Remove the period
-                line = line[:-1]
-                # Add line to block and continue to next iteration
-                curr_block.append(line)
-                continue
-            # End the current block
-            if not in_single_sentence:
-                # Because we've already added this line to curr_block
-                curr_block.append(line)
-            print('{}\t{}'.format('{},{}'.format(block_count, filename), ' '.join(curr_block)))
-            curr_block = []
-            block_count += 1
-        elif not in_single_sentence:
-            curr_block.append(line)
-"""
 
 if __name__ == '__main__':
     main()
