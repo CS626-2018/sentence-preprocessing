@@ -206,9 +206,9 @@ def convert_lines_to_sentences(filename, chunk_index, lines):
     # Use nltk to parse into sentences
     sentences = []
     tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
-    for sentence in tokenizer.tokenize('\n'.join(lines)):
-        # Replace newlines with spaces
-        sentences.append(' '.join(sentence.split('\n')))
+    for sentence in tokenizer.tokenize('\\'.join(lines)):
+        # Replace backslashes with spaces
+        sentences.append(' '.join(sentence.split('\\')))
 
     # Parse multiple periods to determine if they end a sentence
     sentences = replace_multiple_periods(sentences)
@@ -225,10 +225,10 @@ def convert_lines_to_sentences(filename, chunk_index, lines):
         sentence = ' '.join(word_tokenize(sentence))
         sentence = re.sub(r'(\'\'|\`\`)', '"', sentence)
         sentence = re.sub(r'\s\'\s', ' " ', sentence)
-        # Append newlines on terminators to split on later
-        sentence = re.sub(r'\s\!\s', ' !\n ', sentence)
-        sentence = re.sub(r'\s\?\s', ' ?\n ', sentence)
-        sentence = re.sub(r'\s[\.\;]\s', ' \n ', sentence)
+        # Append backslashes on terminators to split on later
+        sentence = re.sub(r'\s\!\s', ' !\\ ', sentence)
+        sentence = re.sub(r'\s\?\s', ' ?\\ ', sentence)
+        sentence = re.sub(r'\s[\.\;]\s', ' \\ ', sentence)
         sentences[i] = sentence
 
     # Repleace known contractions with asterisks for placeholders
@@ -239,7 +239,7 @@ def convert_lines_to_sentences(filename, chunk_index, lines):
                 if '\'' in word:
                     # Check if we have a known contraction, otherwise remove the single quote
                     if word in CONTRACTIONS:
-                        words[j] = re.sub(r'\'', '\*', word)
+                        words[j] = re.sub(r'\'', '*', word)
                     else:
                         words[j] = re.sub(r'\'', '', word)
             sentences[i] = ' '.join(words)
@@ -250,18 +250,17 @@ def convert_lines_to_sentences(filename, chunk_index, lines):
     # Remove any leftover single quotes
     #sentences = [re.sub(r'\'', '', sentence) for sentence in sentences]
     
-    # Need one final pass to split on newlines gathered in terminator section
+    # Need one final pass to split on backslashes gathered in terminator section
     final_sentences = []
     for sentence in sentences:
-        final_sentences += [s.strip() for s in sentence.split('\n') if len(s) > 0]
+        final_sentences += [s.strip() for s in sentence.split('\\') if len(s) > 0]
 
     # Remove placeholder asterisks with single quotes
     # Final pass to remove all punctuation
     final_sentences = remove_punctuation([re.sub(r'\*', '\'', sentence) for sentence in final_sentences])
     
     # Output to reducer
-    for sentence in final_sentences:
-        print('{}\t{}\t{}'.format(filename, chunk_index, sentence))
+    print('{}\t{}\t{}'.format(filename, chunk_index, '\\'.join(final_sentences)))
 
 def main(argv):
     local = False
@@ -276,45 +275,52 @@ def main(argv):
     for line in sys.stdin:
         line = line.strip()
         if len(line) > 0:
-            # Check if this is being ran outside of Hadoop
-            line_split = None
-            if not local:
-                # We're on Hadoop
-                line_split = line.split()
-            else:
-                line_split = ['', 'local', line]
-            # Pos 0  = byte offset
-            # Pos 1  = filename
-            # Pos 2+ = line
+            try:
+                # Check if this is being ran outside of Hadoop
+                line_split = None
+                if not local:
+                    # We're on Hadoop
+                    line_split = line.split()
+                else:
+                    line_split = ['', 'local', line]
+                # Ignore lines with no content
+                if len(line_split < 3):
+                    continue
+                # Pos 0  = byte offset
+                # Pos 1  = filename
+                # Pos 2+ = line
+                filename = line_split[1]
+                line_parsed = ' '.join(line_split[2:]).strip()
+                if curr_file is None:
+                    curr_file = filename
 
-            filename = line_split[1]
-            line_parsed = ' '.join(line_split[2:])
-            if curr_file is None:
-                curr_file = filename
-
-            # Skip empty lines
-            #if len(line_parsed) > 0:
-            # Check if ends a chunk
-            if line_parsed[-1] in ('.', '!', '?') or len(line_parsed) == 0 or curr_file != filename:
-                if len(line_parsed) > 0 :
-                    if curr_file != filename:
-                        # End current chunk
-                        convert_lines_to_sentences(curr_file, chunk_count, line_chunk)
-                        # Start new chunk for new file
-                        line_chunk = [line_parsed]
-                        chunk_count = 0
-                        curr_file = filename
+                # Skip empty lines
+                #if len(line_parsed) > 0:
+                # Check if ends a chunk
+                if line_parsed[-1] in ('.', '!', '?') or len(line_parsed) == 0 or curr_file != filename:
+                    if len(line_parsed) > 0 :
+                        if curr_file != filename:
+                            # End current chunk
+                            convert_lines_to_sentences(curr_file, chunk_count, line_chunk)
+                            # Start new chunk for new file
+                            line_chunk = [line_parsed]
+                            chunk_count = 0
+                            curr_file = filename
+                        else:
+                            # End current chunk
+                            line_chunk.append(line_parsed)
+                            convert_lines_to_sentences(curr_file, chunk_count, line_chunk)
+                            # Start new chunk for same file
+                            line_chunk = []
+                            chunk_count += 1
                     else:
-                        # End current chunk
-                        line_chunk.append(line_parsed)
                         convert_lines_to_sentences(curr_file, chunk_count, line_chunk)
-                        # Start new chunk for same file
                         line_chunk = []
                         chunk_count += 1
                 else:
-                    convert_lines_to_sentences(curr_file, chunk_count, line_chunk)
-                    line_chunk = []
-                    chunk_count += 1
+                    line_chunk.append(line_parsed)
+            except Exception as e:
+                print('Line: {}, exception: {}'.format(line, repr(e)))
 
 if __name__ == '__main__':
     main(sys.argv[1:])
