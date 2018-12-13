@@ -54,14 +54,9 @@ def main(argv):
     if candidate_dir[-1] not in ('/', '\\'):
         candidate_dir += '/'
 
-    print('Candidate dir: {}'.format(candidate_dir))
-    print('Reference dir: {}'.format(reference_dir))
-
     # Open candidate files:
     for candidate_file in os.listdir(candidate_dir):
-        print('candidate_file: {}'.format(candidate_dir+candidate_file))
-        if os.path.isfile(candidate_dir+candidate_file):# and re.search('part', candidate_file):
-            print('Processing file....')
+        if os.path.isfile(candidate_dir+candidate_file):
             with open(candidate_dir+candidate_file, 'r') as f:
                 candidate_count = 0
                 curr_file = None
@@ -69,8 +64,6 @@ def main(argv):
                 for line in f.readlines():
                     line = line.strip()
                     filename, sentence = line.split('\t', 2)
-                    if filename in ('113.txt', '120.txt'):
-                        continue
                     if curr_file is None or candidate_count < EVAL_LIMIT:
                         curr_file = filename
                         candidate_count += 1
