@@ -284,7 +284,7 @@ def main(argv):
                 else:
                     line_split = ['', 'local', line]
                 # Ignore lines with no content
-                if len(line_split < 3):
+                if len(line_split) < 3:
                     continue
                 # Pos 0  = byte offset
                 # Pos 1  = filename
