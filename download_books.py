@@ -2,6 +2,7 @@
 
 import os
 import re
+from string import ascii_lowercase
 import urllib.request as url
 
 from gutenberg.acquire import load_etext
@@ -9,7 +10,7 @@ from gutenberg.cleanup import strip_headers
 
 BOOK_FILE_FORMAT = 'data/books/{}.txt'
 BOOK_IDS_FILE = 'data/book_ids.txt'
-TOP_BOOKS_URL = 'http://www.gutenberg.org/browse/scores/top'
+BOOKS_URL = 'https://www.gutenberg.org/browse/titles/{}'
 
 book_ids = set()
 
@@ -21,17 +22,19 @@ if os.path.isfile(BOOK_IDS_FILE):
 elif not os.path.exists(os.path.dirname(BOOK_IDS_FILE)):
     os.makedirs(os.path.dirname(BOOK_IDS_FILE))
 
-# Get all the book ids on the top url page and add to book ids set
-with url.urlopen(TOP_BOOKS_URL) as response:
-    for line in response.readlines():
-        line = line.decode()
-        r = re.search('href="/ebooks/(\d+)">', line)
-        if r:
-            # Try adding the book id to the set
-            try:
-                book_ids.add(int(r.group(1)))
-            except ValueError as e:
-                print(repr(e))
+# Iterate over books starting with A-Z
+for letter in ascii_lowercase:
+    with url.urlopen(BOOKS_URL.format(letter)) as response:
+        for line in response.readlines():
+            line = line.decode()
+            # Search for the ID of english books
+            r = re.search('href="/ebooks/(\d+)">.*\(English\)', line)
+            if r:
+                # Try adding the book id to the set
+                try:
+                    book_ids.add(int(r.group(1)))
+                except ValueError as e:
+                    print(repr(e))
 
 # Overwrite the book ids file with the updated list of book ids
 with open(BOOK_IDS_FILE, 'w+') as f:
