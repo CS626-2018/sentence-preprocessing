@@ -10,7 +10,7 @@ if [ ! -d output ]; then
 fi
 mkdir $dir
 
-input_dir=cs626/project/data/books_smallmed/
+input_dir=cs626/project/data/books/
 output_dir=cs626/project/output
 hadoop_jar=/usr/lib/hadoop-mapreduce/hadoop-streaming-2.6.0-cdh5.13.0.jar
 mapper=mapper.py
@@ -20,9 +20,10 @@ reducer=reducer.py
 file_num=$(hadoop fs -ls $input_dir/*.txt | wc -l)
 echo "Pre-processing $file_num files."
 
-# Previously used parameters
+# Parameters for partitioner:
 #-D mapred.reduce.tasks=$file_num \
 #-partitioner cs626.sentence.preprocessing.format.FilePartitioner \
+
 # Execute the hadoop-streaming jar for mapreduce
 time hadoop jar $hadoop_jar \
 	-Dmapred.text.key.comparator.options="-k1,1 -k2n" \
