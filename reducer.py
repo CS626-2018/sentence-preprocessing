@@ -7,9 +7,11 @@ importer = zipimport.zipimporter('nltk.mod')
 nltk = importer.load_module('nltk')
 from nltk.sentiment.vader import SentimentIntensityAnalyzer 
 
-FILENAME_IDX = 0
-SENTENCE_INDEX_IDX = 1
-SENTENCE_IDK = 2
+# Sentiments scoring:
+# neg: Negative
+# neu: Neutral
+# pos: Positive
+# compound: Compound (i.e. aggregated score)
 
 # Sentiment analyzer
 sid = SentimentIntensityAnalyzer()
@@ -25,35 +27,14 @@ for line in sys.stdin:
             for sentence in sentences.split('\\'):
                 # Extract features from each sentence
                 tokens = nltk.word_tokenize(sentence)
+                # POS-tagging
                 tagged = nltk.pos_tag(tokens)
+                # Sentiment analyzer
                 ss = sid.polarity_scores(sentence)
                 polarities = []
                 for k in ss:
                     polarities.append('{},{}'.format(k, ss[k]))
-                #print('{}\t{}\t{}'.format(filename, chunk_index, sentence))
-                print('{}\t{}\t{}\t{}\t{}'.format(
-                    filename, chunk_index, sentence, tagged, polarities))
+                print('{}\t{}\t{}\t{}'.format(filename, sentence, tagged, polarities))
         except Exception as e:
             print('FAILURE with line [{}], exception: {}'.format(line, repr(e)))
             continue
-
-"""import nltk
-from nltk.sentiment.vader import SentimentIntensityAnalyzer 
-  
-hotel_rev = ["I like going to the cinema.", "I don't like going to the cinema.", "car is green"]
-  
-sid = SentimentIntensityAnalyzer()
-for sentence in hotel_rev:
-     print(sentence)
-     ss = sid.polarity_scores(sentence)
-     for k in ss:
-         print('{0}: {1}, '.format(k, ss[k]), end='')
-     print()
-
-
-# neg: Negative
-# neu: Neutral
-# pos: Positive
-# compound: Compound (i.e. aggregated score)
-
-"""
